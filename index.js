@@ -4,6 +4,9 @@ const debug = require('debug')
 const info = debug('reconnecting-amqp:info')
 const warn = debug('reconnecting-amqp:warn')
 
+const _onClose = Symbol('_onClose')
+const _reconsume = Symbol('_reconsume')
+
 class ReconnectingAMQP {
   constructor(endpoint, options) {
     const url = new URL(endpoint)
@@ -15,6 +18,14 @@ class ReconnectingAMQP {
     this.protocol = url.protocol
     this.hostname = url.hostname
     this.port = url.port
+    /*
+    consumer = {
+      queue: String,
+      onConsume: Function,
+      autoAck: Boolean
+    }
+    */
+    this.consumers = []
   }
 
   async connect() {
@@ -27,16 +38,19 @@ class ReconnectingAMQP {
       this.channel = await this.connection.createChannel()
       info('Successfully created channel')
 
-      this.connection.on('close', () => {
-        warn('AMQP connection closed. Reconnecting...')
-        this.connect()
-      })
+      this.connection.on('close', this[_onClose])
     } catch (e) {
       warn(e)
     }
   }
 
-  async consume(queue, onConsume) {
+  async consume(queue, onConsume, autoAck = false) {
+    this.consumers.push({
+      queue,
+      onConsume,
+      autoAck
+    })
+
     try {
       await this.channel.assertQueue(queue)
 
@@ -47,11 +61,11 @@ class ReconnectingAMQP {
           return
         }
 
-        info(message.content)
-
         onConsume(message)
 
-        this.channel.ack(message)
+        if (autoAck) {
+          this.channel.ack(message)
+        }
       })
     } catch (e) {
       warn(e)
@@ -67,6 +81,18 @@ class ReconnectingAMQP {
       channel.close()
       connection.close()
     }
+  }
+
+  async [_onClose]() {
+    warn('AMQP connection closed. Reconnecting...')
+    await this.connect()
+    this[_reconsume]()
+  }
+
+  async [_reconsume]() {
+    this.consumers.forEach(({ queue, onConsume, autoAck }) => {
+      this.consume(queue, onConsume, autoAck)
+    })
   }
 }
 
