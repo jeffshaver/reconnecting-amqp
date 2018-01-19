@@ -1,0 +1,24 @@
+{
+  "name": "reconnecting-amqp",
+  "version": "0.0.1",
+  "description": "wrapper around amqplib to auto-reconnect",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeffshaver/reconnecting-amqp.git"
+  },
+  "author": "Jeffrey Shaver",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jeffshaver/reconnecting-amqp/issues"
+  },
+  "homepage": "https://github.com/jeffshaver/reconnecting-amqp#readme",
+  "dependencies": {
+    "amqplib": "^0.5.2",
+    "debug": "^3.1.0"
+  }
+}
