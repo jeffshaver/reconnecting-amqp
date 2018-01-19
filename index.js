@@ -26,6 +26,8 @@ class ReconnectingAMQP {
     }
     */
     this.consumers = []
+
+    this[_onClose] = this[_onClose].bind(this)
   }
 
   async connect() {
