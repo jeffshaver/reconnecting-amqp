@@ -4,8 +4,11 @@ const debug = require('debug')
 const info = debug('reconnecting-amqp:info')
 const warn = debug('reconnecting-amqp:warn')
 
+const _delay = Symbol('_delay')
+const _updateReconnectDelay = Symbol('_updateReconnectDelay')
 const _onClose = Symbol('_onClose')
 const _reconsume = Symbol('_reconsume')
+const _reconnect = Symbol('_reconnect')
 
 class ReconnectingAMQP {
   constructor(endpoint, options) {
@@ -18,6 +21,11 @@ class ReconnectingAMQP {
     this.protocol = url.protocol
     this.hostname = url.hostname
     this.port = url.port
+    this.minReconnectDelay = 1500
+    this.maxReconnectDelay = 10000
+    this.reconnectCount = 0
+    this.reconnectDelay = 0
+    this.reconnectDelayGrowthFactor = 1.3
     /*
     consumer = {
       queue: String,
@@ -37,12 +45,15 @@ class ReconnectingAMQP {
         'Successfully connected to ' +
           `${this.protocol}//${this.hostname}:${this.port}`
       )
+      this.reconnectCount = 0
+      this.reconnectDelay = 0
       this.channel = await this.connection.createChannel()
       info('Successfully created channel')
 
       this.connection.on('close', this[_onClose])
     } catch (e) {
       warn(e)
+      this[_reconnect]()
     }
   }
 
@@ -85,8 +96,36 @@ class ReconnectingAMQP {
     }
   }
 
+  [_delay](ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  [_updateReconnectDelay]() {
+    if (this.reconnectDelay === 0) {
+      this.reconnectDelay =
+        this.minReconnectDelay + Math.random() * this.minReconnectDelay
+    }
+
+    const reconnectDelay = this.reconnectDelay * this.reconnectDelayGrowthFactor
+
+    this.reconnectDelay =
+      reconnectDelay > this.maxReconnectDelay
+        ? this.maxReconnectDelay
+        : reconnectDelay
+  }
+
   async [_onClose]() {
-    warn('AMQP connection closed. Reconnecting...')
+    warn('AMQP connection closed.')
+    await this[_reconnect]()
+    this[_reconsume]()
+  }
+
+  async [_reconnect]() {
+    this.reconnectCount = this.reconnectCount + 1
+    this[_updateReconnectDelay]()
+    info(`Will attempt reconnect in ${this.reconnectDelay / 1000}s`)
+    await this[_delay](this.reconnectDelay)
+    info(`Reconnecting to ${this.protocol}//${this.hostname}:${this.port}...`)
     await this.connect()
     this[_reconsume]()
   }
