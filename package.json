@@ -1,6 +1,6 @@
 {
   "name": "reconnecting-amqp",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "wrapper around amqplib to auto-reconnect",
   "main": "index.js",
   "devDependencies": {},
